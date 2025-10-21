@@ -1,4 +1,4 @@
-# ShapeShift
+# moveShift
 
 ## 🚀 Join the ShapeShift Waitlist
 
