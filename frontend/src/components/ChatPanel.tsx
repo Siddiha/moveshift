@@ -129,16 +129,6 @@ const AttachBtn = styled.button`
 
 type ChatMsg = { role: "user" | "system"; text: string };
 
-function toRadians(value: number) {
-    return (value * Math.PI) / 180;
-}
-
-function parseNumber(s: string | undefined, fallback: number) {
-    if (s == null) return fallback;
-    const v = parseFloat(s);
-    return Number.isFinite(v) ? v : fallback;
-}
-
 async function fileToBase64(file: File): Promise<string> {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -151,19 +141,6 @@ async function fileToBase64(file: File): Promise<string> {
         reader.readAsDataURL(file);
     });
 }
-
-const COLOR_NAMES: Record<string, string> = {
-    red: "#ff4d4f",
-    green: "#52c41a",
-    blue: "#1890ff",
-    yellow: "#fadb14",
-    orange: "#fa8c16",
-    purple: "#722ed1",
-    pink: "#eb2f96",
-    white: "#ffffff",
-    black: "#000000",
-    gray: "#8c8c8c",
-};
 
 export function ChatPanel() {
     const [input, setInput] = useState("");
@@ -589,49 +566,6 @@ export function ChatPanel() {
         }
     }
 
-    async function callRodinDirect(prompt: string | undefined, attached?: File | null) {
-        try {
-            setIsLoading(true);
-            const pre = new Set(((useEditor as any).getState?.().objects ?? []).map((o: any) => o.id));
-            let imageUrl: string | undefined = undefined;
-            if (attached) {
-                try {
-                    const data = await fileToBase64(attached);
-                    imageUrl = `data:${attached.type || 'image/png'};base64,${data}`;
-                } catch {}
-            }
-            if (!imageUrl && (!prompt || !prompt.trim())) {
-                return "Provide a prompt or attach an image";
-            }
-            const body: any = {
-                ...(prompt ? { prompt } : {}),
-                ...(imageUrl ? { imageUrl } : {}),
-            };
-            const rr = await fetch(`${SERVER_URL}/api/rodin`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(body),
-            });
-            const jd = await rr.json();
-            const glbUrl = jd?.glbUrl;
-            if (!glbUrl) return "Rodin failed";
-            const resp = await fetch(glbUrl);
-            if (!resp.ok) return "Fetch GLB failed";
-            const blob = await resp.blob();
-            const file = new File([blob], "rodin.glb", { type: blob.type || 'model/gltf-binary' });
-            const objs = await importObjectsFromGLTF(file);
-            if (addSceneObjects) addSceneObjects(objs);
-            const postObjs = ((useEditor as any).getState?.().objects ?? []);
-            const newIds = postObjs.filter((o: any) => !pre.has(o.id)).map((o: any) => o.id);
-            if (newIds.length) ensurePinned(newIds);
-            return `Imported ${objs.length} object(s)`;
-        } catch {
-            return "";
-        } finally {
-            setIsLoading(false);
-        }
-    }
-
     function checkpoint(prompt: string, response: string) {
         addCheckpoint({ prompt, response, label: prompt.slice(0, 40) });
     }
@@ -647,33 +581,6 @@ export function ChatPanel() {
     function resolveId(nameOrId: string): string | undefined {
         const obj = findByNameOrId(nameOrId);
         return obj ? obj.id : undefined;
-    }
-
-    function parseAddParams(kind: GeometryKind, rest: string): any | undefined {
-        const get = (key: string) => {
-            const m = rest.match(new RegExp(`${key}\\s+(-?\\d*\\.?\\d+)`, "i"));
-            return m ? parseFloat(m[1]) : undefined;
-        };
-        if (kind === "box")
-            return {
-                width: get("width") ?? 1,
-                height: get("height") ?? 1,
-                depth: get("depth") ?? 1,
-            };
-        if (kind === "sphere") return { radius: get("radius") ?? 0.5 };
-        if (kind === "cylinder")
-            return {
-                radiusTop: get("radiustop") ?? get("radius") ?? 0.5,
-                radiusBottom: get("radiusbottom") ?? get("radius") ?? 0.5,
-                height: get("height") ?? 1,
-            };
-        if (kind === "cone")
-            return { radius: get("radius") ?? 0.5, height: get("height") ?? 1 };
-        if (kind === "torus")
-            return { radius: get("radius") ?? 0.5, tube: get("tube") ?? 0.2 };
-        if (kind === "plane")
-            return { width: get("width") ?? 1, height: get("height") ?? 1 };
-        return undefined;
     }
 
     async function handleAgent(text: string) {
